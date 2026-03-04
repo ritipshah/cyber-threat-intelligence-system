@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Cyber Threat Intelligence Dashboard</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:#0f172a;
+color:white;
+margin:0;
+}
+
+header{
+background:#1e293b;
+padding:20px;
+font-size:24px;
+text-align:center;
+}
+
+.container{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:20px;
+padding:20px;
+}
+
+.card{
+background:#1e293b;
+padding:20px;
+border-radius:10px;
+box-shadow:0 0 10px rgba(0,0,0,0.5);
+}
+
+.stats{
+display:flex;
+gap:20px;
+padding:20px;
+}
+
+.stat{
+background:#1e293b;
+padding:20px;
+border-radius:10px;
+flex:1;
+text-align:center;
+font-size:20px;
+}
+
+button{
+padding:10px 20px;
+margin-top:10px;
+background:#3b82f6;
+border:none;
+color:white;
+border-radius:5px;
+cursor:pointer;
+}
+
+button:hover{
+background:#2563eb;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:10px;
+}
+
+th,td{
+padding:8px;
+border-bottom:1px solid #334155;
+}
+
+.success{color:#22c55e;font-weight:bold;}
+.failed{color:#ef4444;font-weight:bold;}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+Cyber Threat Intelligence Dashboard
+</header>
+
+
+<div class="stats">
+
+<div class="stat">
+Total Users
+<div id="totalUsers">--</div>
+</div>
+
+<div class="stat">
+High Risk Users
+<div id="highRisk">--</div>
+</div>
+
+<div class="stat">
+Open Incidents
+<div id="incidentCount">--</div>
+</div>
+
+</div>
+
+
+<div class="container">
+
+<div class="card">
+<h2>User Risk Score</h2>
+<button onclick="loadRisk()">Check Risk</button>
+<div id="risk">--</div>
+</div>
+
+<div class="card">
+<h2>Detected Incidents</h2>
+<button onclick="loadIncidents()">Load Incidents</button>
+<pre id="incidents"></pre>
+</div>
+
+
+<div class="card" style="grid-column:span 2;">
+<h2>Security Events (Live Feed)</h2>
+<button onclick="loadEvents()">Load Events</button>
+
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>User</th>
+<th>Status</th>
+<th>Time</th>
+</tr>
+</thead>
+
+<tbody id="eventsTable"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
+<script>
+
+function loadStats(){
+
+fetch('/users')
+.then(res=>res.json())
+.then(data=>{
+document.getElementById("totalUsers").innerText=data.length;
+});
+
+
+fetch('/risks')
+.then(res=>res.json())
+.then(data=>{
+
+let high=0;
+
+data.forEach(r=>{
+if(r.current_score>70){
+high++;
+}
+});
+
+document.getElementById("highRisk").innerText=high;
+
+});
+
+
+fetch('/incidents')
+.then(res=>res.json())
+.then(data=>{
+document.getElementById("incidentCount").innerText=data.length;
+});
+
+}
+
+function loadRisk(){
+
+let userId = localStorage.getItem("userId");
+
+if(!userId){
+document.getElementById("risk").innerText="No user logged in";
+return;
+}
+
+fetch('/risk/' + userId)
+.then(res=>res.json())
+.then(data=>{
+
+let score=data.current_score;
+
+let color="lime";
+
+if(score>70) color="red";
+else if(score>40) color="orange";
+
+document.getElementById("risk").innerHTML=
+"<span style='color:"+color+"'>"+score+"</span>";
+
+})
+.catch(()=>{
+document.getElementById("risk").innerText="Risk not found";
+});
+
+}
+
+
+
+function loadEvents(){
+
+fetch('/events')
+.then(res=>res.json())
+.then(data=>{
+
+let table="";
+
+data.forEach(e=>{
+
+let statusClass=e.status=="SUCCESS" ? "success":"failed";
+
+let time=new Date(e.event_timestamp).toLocaleString();
+
+table+=`
+<tr>
+<td>${e.event_id}</td>
+<td>${e.user_id}</td>
+<td class="${statusClass}">${e.status}</td>
+<td>${time}</td>
+</tr>
+`;
+
+});
+
+document.getElementById("eventsTable").innerHTML=table;
+
+});
+
+}
+
+
+function loadIncidents(){
+
+fetch('/incidents')
+.then(res=>res.json())
+.then(data=>{
+
+let text="";
+
+data.forEach(i=>{
+
+text+=`
+Incident: ${i.title}
+Severity: ${i.severity}
+Status: ${i.status}
+Time: ${new Date(i.created_at).toLocaleString()}
+
+`;
+
+});
+
+document.getElementById("incidents").innerText=text;
+
+});
+
+}
+
+
+loadStats();
+setInterval(loadStats,10000);
+setInterval(loadEvents,5000);
+
+</script>
+
+</body>
+</html>
